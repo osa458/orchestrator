@@ -26,7 +26,7 @@ export async function POST(req: Request){
   const runId = crypto.randomUUID();
   await setStatus(runId,{ stage:"nlp:structuring" });
 
-  // 1) Ask for JSON only + enable json response_format for OpenAI
+  // Ask for strict JSON
   const specRaw = await llm({
     model: process.env.DEFAULT_PROVIDER === "google" ? "google/gemini-2.5-pro" : "gpt-4.1",
     temperature: 0,
@@ -40,20 +40,12 @@ export async function POST(req: Request){
     ]
   });
 
-  // 2) Extract/coerce JSON and validate
   const jsonText = extractJson(specRaw);
+
   let spec: ProjectSpec;
   try {
     spec = Spec.parse(JSON.parse(jsonText));
   } catch (e:any) {
-    // Safe fallback spec so the pipeline continues, plus error detail for you
-    const fallback: ProjectSpec = {
-      name: "Untitled App",
-      stack: { frontend:"nextjs-14", backend:"none", db:"none", auth:"none" },
-      features: [],
-      nonfunc: {},
-      acceptance: []
-    };
     return new Response(JSON.stringify({
       error: "Spec validation failed",
       detail: String(e),
@@ -63,8 +55,10 @@ export async function POST(req: Request){
 
   const yaml = specToYAML(spec);
 
-  // 3) Create GitHub issue (relative URL — no APP_URL pitfalls)
-  const issue = await fetch(`/api/github/open-issue`,{
+  // Build absolute URL from the incoming request (Edge needs this)
+  const { origin } = new URL(req.url);
+
+  const issue = await fetch(`${origin}/api/github/open-issue`,{
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({
