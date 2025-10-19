@@ -5,6 +5,9 @@
     "module": "ESNext",
     "jsx": "preserve",
     "moduleResolution": "Bundler",
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
   }
 }
